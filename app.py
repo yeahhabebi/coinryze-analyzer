@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from backend import data_loader, predictor, simulator, utils
+import data_loader, predictor, simulator, utils
 
 st.title("🎲 Coinryze Analyzer")
 
