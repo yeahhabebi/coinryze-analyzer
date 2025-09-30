@@ -1,118 +1,148 @@
+# frontend/app.py
 import os
+import json
 import random
 import pandas as pd
 import streamlit as st
 import matplotlib.pyplot as plt
+import requests
 
-# -----------------------------
-# Title
-# -----------------------------
 st.set_page_config(page_title="Coinryze Analyzer", layout="wide")
 st.title("📊 Coinryze Analyzer")
-st.write("Analyze historical game draws, visualize patterns, and test predictions.")
 
-# -----------------------------
-# Load CSV (Upload or Default)
-# -----------------------------
-uploaded = st.file_uploader("Upload your game history CSV", type="csv")
+# Backend URL (optional) - set as environment variable on Render or leave blank to skip prediction requests
+BACKEND_URL = os.environ.get("BACKEND_URL", "").rstrip("/")
 
+# --- UI: data source toggle ---
+st.sidebar.header("Data Source")
+data_source = st.sidebar.radio("Choose data:", ["Sample Data (bundled)", "Upload CSV"])
+
+uploaded_file = None
 df = None
-if uploaded is not None:
-    try:
-        df = pd.read_csv(uploaded)
-        st.success("✅ Loaded uploaded CSV")
-    except Exception as e:
-        st.error(f"Could not read uploaded CSV: {e}")
 
-# Fallback: bundled sample_history.csv
-if df is None:
-    here = os.path.dirname(os.path.abspath(__file__))
-    sample_path = os.path.join(here, "sample_history.csv")
-
+if data_source == "Upload CSV":
+    uploaded_file = st.file_uploader("Upload your game history CSV", type=["csv"])
+    if uploaded_file:
+        try:
+            df = pd.read_csv(uploaded_file)
+            st.success("✅ Uploaded CSV loaded")
+        except Exception as e:
+            st.error(f"Failed to read uploaded CSV: {e}")
+            st.stop()
+else:
+    # Try load bundled sample
+    sample_path = os.path.join(os.path.dirname(__file__), "sample_history.csv")
     if os.path.exists(sample_path):
         try:
             df = pd.read_csv(sample_path)
-            st.info("📂 Loaded bundled sample dataset (sample_history.csv)")
+            st.info("📂 Loaded bundled sample_history.csv")
         except Exception as e:
-            st.error(f"Found sample CSV but failed to load: {e}")
+            st.error(f"Failed to load bundled sample CSV: {e}")
+            st.stop()
+    else:
+        st.warning("No bundled sample file found. Please upload a CSV.")
+        st.stop()
 
-# Final fallback
-if df is None:
-    st.warning("⚠️ No CSV loaded. Please upload a file to continue.")
-    st.stop()
+# Normalize columns
+df.columns = [c.strip() for c in df.columns]
 
-# -----------------------------
-# Clean & Prepare Data
-# -----------------------------
-# Try to normalize column names
-df.columns = [c.strip().lower() for c in df.columns]
-
-# Guess expected columns
-# Example assumption: ['issue no.', 'winning number', 'winning results', 'winning color']
-num_col = None
-color_col = None
-size_col = None
-
-for c in df.columns:
-    if "number" in c:
-        num_col = c
-    if "color" in c:
-        color_col = c
-    if "big" in c or "small" in c or "result" in c:
-        size_col = c
-
-# -----------------------------
-# Show Preview
-# -----------------------------
+# Basic preview
 st.subheader("🔎 Data Preview")
-st.dataframe(df.head())
+st.dataframe(df.head(50))
 
-# -----------------------------
-# Stats Section
-# -----------------------------
+# Guess useful columns (customize if your CSV uses other names)
+possible_number_cols = [c for c in df.columns if "number" in c.lower() or "winning" in c.lower()]
+possible_color_cols = [c for c in df.columns if "color" in c.lower()]
+possible_size_cols = [c for c in df.columns if "big" in c.lower() or "small" in c.lower() or "size" in c.lower()]
+
+num_col = possible_number_cols[0] if possible_number_cols else None
+color_col = possible_color_cols[0] if possible_color_cols else None
+size_col = possible_size_cols[0] if possible_size_cols else None
+
+st.sidebar.write("Detected columns:")
+st.sidebar.write(f"Number: {num_col}")
+st.sidebar.write(f"Color: {color_col}")
+st.sidebar.write(f"Size/Small-Big: {size_col}")
+
+# Summary stats
 st.subheader("📈 Summary Statistics")
+st.write(f"Total draws: **{len(df)}**")
 
-total_draws = len(df)
-st.metric("Total Draws", total_draws)
+cols = st.columns(3)
+with cols[0]:
+    if num_col:
+        st.metric("Latest number", df[num_col].iloc[-1])
+    else:
+        st.write("No number column detected.")
 
-if size_col:
-    size_counts = df[size_col].value_counts()
-    st.write("Size Distribution:")
-    st.bar_chart(size_counts)
+with cols[1]:
+    if color_col:
+        st.write(df[color_col].value_counts().to_frame("count"))
+    else:
+        st.write("No color column detected.")
+
+with cols[2]:
+    if size_col:
+        st.write(df[size_col].value_counts().to_frame("count"))
+    else:
+        st.write("No size column detected.")
+
+# Charts
+st.subheader("📊 Charts")
+if num_col:
+    st.write("Recent number trend (last 50)")
+    fig, ax = plt.subplots(figsize=(10, 3))
+    ax.plot(df[num_col].tail(50).values, marker="o")
+    ax.set_xlabel("Draw (most recent at right)")
+    ax.set_ylabel("Number")
+    st.pyplot(fig)
 
 if color_col:
-    color_counts = df[color_col].value_counts()
-    st.write("Color Distribution:")
-    st.bar_chart(color_counts)
+    st.write("Color distribution")
+    st.bar_chart(df[color_col].value_counts())
 
-# -----------------------------
-# Number Trend Visualization
-# -----------------------------
-if num_col:
-    st.subheader("📊 Recent Number Trend")
-    plt.figure(figsize=(10,4))
-    plt.plot(df[num_col].tail(50).values, marker="o")
-    plt.title("Last 50 Draws")
-    plt.xlabel("Draw")
-    plt.ylabel("Number")
-    st.pyplot(plt)
+# Prediction demo (client to backend)
+st.subheader("🤖 Predictions")
 
-# -----------------------------
-# Simple Prediction (Demo)
-# -----------------------------
-st.subheader("🎯 Prediction Demo")
+# Build a small input payload: recent N numbers
+N = st.slider("Use last N draws for prediction", min_value=5, max_value=200, value=20)
 
-if num_col:
-    last_number = df[num_col].iloc[-1]
-    next_guess = random.choice(df[num_col].unique())
-    st.write(f"Last number: **{last_number}**")
-    st.success(f"Predicted next number (demo): **{next_guess}**")
+last_values = df[num_col].tail(N).tolist() if num_col else []
+st.write("Input to model (last numbers):", last_values)
 
-    if size_col:
-        st.write(f"Based on last result, trend suggests: **{df[size_col].iloc[-1]} → ?**")
+predict_button = st.button("Request prediction from backend (if configured)")
 
-# -----------------------------
-# Footer
-# -----------------------------
-st.markdown("---")
-st.caption("🚀 Coinryze Analyzer — powered by Streamlit & Render")
+if predict_button:
+    if not BACKEND_URL:
+        st.error("No BACKEND_URL configured. Set environment variable BACKEND_URL to call an API.")
+    else:
+        payload = {"last_numbers": last_values}
+        try:
+            r = requests.post(f"{BACKEND_URL}/predict", json=payload, timeout=15)
+            r.raise_for_status()
+            out = r.json()
+            st.success("Prediction received")
+            st.json(out)
+        except Exception as e:
+            st.error(f"Prediction request failed: {e}")
+
+# Small local demo prediction fallback
+st.write("---")
+st.write("If backend isn't available, use a small local demo prediction:")
+if st.button("Local demo prediction"):
+    if num_col:
+        last = df[num_col].iloc[-1]
+        demo_num = random.choice(sorted(df[num_col].unique()))
+        demo_color = None
+        if demo_num % 2 == 0:
+            demo_color = "Green (even)" 
+        else:
+            demo_color = "Red (odd)"
+        demo_size = "Big" if demo_num >= (df[num_col].max() / 2) else "Small"
+        st.write(f"Demo predicted number: **{demo_num}**")
+        st.write(f"Demo predicted color: **{demo_color}**")
+        st.write(f"Demo predicted size: **{demo_size}**")
+    else:
+        st.write("No numeric column detected to demo prediction.")
+
+st.caption("Tip: For live automation, deploy a backend and a scheduler fetcher. See README for full pipeline.")
