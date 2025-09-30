@@ -1,9 +1,12 @@
-streamlit
+streamlit==1.30.0
 pandas
 numpy
-scikit-learn
 matplotlib
-plotly
-seaborn
+scikit-learn
+joblib
+fastapi
+uvicorn[standard]
 requests
-openpyxl
+beautifulsoup4
+apscheduler
+python-dotenv
