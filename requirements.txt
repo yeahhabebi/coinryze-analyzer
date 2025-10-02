@@ -1,8 +1,13 @@
-coinryze-analyzer/
-│
-├─ frontend/               # your existing frontend
-│   └─ coinryze_history.csv
-├─ fetcher/
-│   └─ fetch_coinryze.py   # the script we just rewrote
-├─ requirements.txt
-└─ render-worker.sh        # startup script for Render Worker
+# requirements.txt
+requests
+beautifulsoup4
+lxml
+pandas
+pyarrow
+apscheduler
+boto3
+fastapi
+uvicorn[standard]
+joblib
+numpy
+scikit-learn
