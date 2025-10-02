@@ -1,6 +1,8 @@
-streamlit
-pandas
-requests
-beautifulsoup4
-lxml
-apscheduler
+coinryze-analyzer/
+│
+├─ frontend/               # your existing frontend
+│   └─ coinryze_history.csv
+├─ fetcher/
+│   └─ fetch_coinryze.py   # the script we just rewrote
+├─ requirements.txt
+└─ render-worker.sh        # startup script for Render Worker
