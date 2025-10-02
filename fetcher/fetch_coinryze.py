@@ -1,45 +1,58 @@
 # fetcher/fetch_coinryze.py
-import requests
-from bs4 import BeautifulSoup
-import pandas as pd
-import time
-import os
 
-BASE = "https://coinryze.org"
-HEADERS = {"User-Agent": "CoinryzeAnalyzerBot/1.0 (+your-email@example.com)"}
-OUT_CSV = os.environ.get("HISTORY_CSV", "data/coinryze_history.csv")
+
+BASE = os.environ.get('COINRYZE_BASE', 'https://coinryze.org')
+HISTORY_CSV = os.environ.get('HISTORY_CSV', 'frontend/coinryze_history.csv')
+HEADERS = {'User-Agent': 'CoinryzeAnalyzerBot/1.0 (+your-email@example.com)'}
+
+
+# --- Adjust this function to match site structure ---
+
 
 def fetch_recent():
-    url = BASE + "/m/history"  # example path - update to the real one
-    r = requests.get(url, headers=HEADERS, timeout=10)
-    r.raise_for_status()
-    soup = BeautifulSoup(r.text, "html.parser")
-    rows = []
-    # You must inspect the page and replace the selector below:
-    for row in soup.select(".history-row"):  # <-- adapt!
-        issue = row.select_one(".issue").get_text(strip=True)
-        number = row.select_one(".number").get_text(strip=True)
-        color = row.select_one(".color").get_text(strip=True) if row.select_one(".color") else ""
-        timestamp = row.select_one(".time").get_text(strip=True) if row.select_one(".time") else ""
-        rows.append({"issue": issue, "number": int(number), "color": color, "ts": timestamp})
-    return pd.DataFrame(rows)
+"""
+Fetch recent draws from coinryze. Edit the CSS selectors below after inspecting the site.
+Return a pandas.DataFrame with columns: issue_id, timestamp, number, color
+"""
+url = urljoin(BASE, '/') # change to exact page like '/m/history' if needed
+r = requests.get(url, headers=HEADERS, timeout=15)
+r.raise_for_status()
+soup = BeautifulSoup(r.text, 'lxml')
 
-def main():
-    os.makedirs("data", exist_ok=True)
-    try:
-        df = fetch_recent()
-        if not df.empty:
-            if os.path.exists(OUT_CSV):
-                old = pd.read_csv(OUT_CSV)
-                combined = pd.concat([old, df]).drop_duplicates(subset=["issue"]).sort_values("issue")
-            else:
-                combined = df
-            combined.to_csv(OUT_CSV, index=False)
-            print("Wrote", len(combined), "rows to", OUT_CSV)
-        else:
-            print("No rows fetched")
-    except Exception as e:
-        print("Fetch error:", e)
 
-if __name__ == "__main__":
-    main()
+rows = []
+# Example: find table rows — change selector to match site
+# 1) Inspect coinryze HTML with your browser and update the selector below.
+for tr in soup.select('table tr'):
+cols = [td.get_text(strip=True) for td in tr.find_all('td')]
+if not cols:
+continue
+# heuristic: look for a row that has an issue id and a number
+# You must adapt the parsing logic to the real page.
+try:
+issue = cols[0]
+number = int(cols[1])
+timestamp = cols[2] if len(cols) > 2 else ''
+color = cols[3] if len(cols) > 3 else ''
+rows.append({'issue_id': issue, 'timestamp': timestamp, 'number': number, 'color': color})
+except Exception:
+continue
+
+
+df = pd.DataFrame(rows)
+logger.info(f'Fetched {len(df)} rows')
+return df
+
+
+
+
+def append_new(df_new, out_path=HISTORY_CSV):
+if df_new.empty:
+logger.info('No new rows')
+return
+if os.path.exists(out_path):
+try:
+df_old = pd.read_csv(out_path)
+except Exception:
+df_old = pd.DataFrame()
+if not df_old.empty and 'issue_id
