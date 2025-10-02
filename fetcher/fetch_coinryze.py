@@ -1,58 +1,35 @@
-# fetcher/fetch_coinryze.py
+import requests, csv, os
+from bs4 import BeautifulSoup
+from apscheduler.schedulers.blocking import BlockingScheduler
+from datetime import datetime
 
+CSV_PATH = "frontend/coinryze_history.csv"
 
-BASE = os.environ.get('COINRYZE_BASE', 'https://coinryze.org')
-HISTORY_CSV = os.environ.get('HISTORY_CSV', 'frontend/coinryze_history.csv')
-HEADERS = {'User-Agent': 'CoinryzeAnalyzerBot/1.0 (+your-email@example.com)'}
+def fetch_and_save():
+    url = "https://coinryze.org"  # TODO: replace with correct endpoint
+    r = requests.get(url, timeout=10)
+    soup = BeautifulSoup(r.text, "lxml")
 
+    # TODO: update selectors based on site’s HTML
+    issue_id = soup.select_one(".issue-class").text.strip()
+    number = soup.select_one(".number-class").text.strip()
+    color = soup.select_one(".color-class").text.strip()
+    size = soup.select_one(".size-class").text.strip()
+    odd_even = "Odd" if int(number) % 2 else "Even"
 
-# --- Adjust this function to match site structure ---
+    row = [issue_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), number, color, size, odd_even]
+    write_header = not os.path.exists(CSV_PATH)
 
+    with open(CSV_PATH, "a", newline="") as f:
+        writer = csv.writer(f)
+        if write_header:
+            writer.writerow(["issue_id","timestamp","number","color","size","odd_even"])
+        writer.writerow(row)
 
-def fetch_recent():
-"""
-Fetch recent draws from coinryze. Edit the CSS selectors below after inspecting the site.
-Return a pandas.DataFrame with columns: issue_id, timestamp, number, color
-"""
-url = urljoin(BASE, '/') # change to exact page like '/m/history' if needed
-r = requests.get(url, headers=HEADERS, timeout=15)
-r.raise_for_status()
-soup = BeautifulSoup(r.text, 'lxml')
+    print("Saved row:", row)
 
-
-rows = []
-# Example: find table rows — change selector to match site
-# 1) Inspect coinryze HTML with your browser and update the selector below.
-for tr in soup.select('table tr'):
-cols = [td.get_text(strip=True) for td in tr.find_all('td')]
-if not cols:
-continue
-# heuristic: look for a row that has an issue id and a number
-# You must adapt the parsing logic to the real page.
-try:
-issue = cols[0]
-number = int(cols[1])
-timestamp = cols[2] if len(cols) > 2 else ''
-color = cols[3] if len(cols) > 3 else ''
-rows.append({'issue_id': issue, 'timestamp': timestamp, 'number': number, 'color': color})
-except Exception:
-continue
-
-
-df = pd.DataFrame(rows)
-logger.info(f'Fetched {len(df)} rows')
-return df
-
-
-
-
-def append_new(df_new, out_path=HISTORY_CSV):
-if df_new.empty:
-logger.info('No new rows')
-return
-if os.path.exists(out_path):
-try:
-df_old = pd.read_csv(out_path)
-except Exception:
-df_old = pd.DataFrame()
-if not df_old.empty and 'issue_id
+if __name__ == "__main__":
+    scheduler = BlockingScheduler()
+    scheduler.add_job(fetch_and_save, "interval", minutes=1)
+    print("Fetcher started... writing to", CSV_PATH)
+    scheduler.start()
