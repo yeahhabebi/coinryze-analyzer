@@ -1,18 +1,24 @@
-# backend/app.py
-import os
-from typing import List
+import os, numpy as np
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-import joblib
-import numpy as np
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="Coinryze Backend")
+MODEL_PATH = os.getenv("MODEL_PATH","models/rf_model.joblib")
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS","*")
 
-MODEL_PATH = os.environ.get("MODEL_PATH", "models/rf_model.joblib")
+origins = ["*"] if ALLOWED_ORIGINS=="*" else [o.strip() for o in ALLOWED_ORIGINS.split(",")]
 
-# Pydantic request shape
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 class PredictRequest(BaseModel):
-    last_numbers: List[int]
+    last_numbers: list
 
 class PredictResponse(BaseModel):
     predicted_number: int
@@ -21,33 +27,34 @@ class PredictResponse(BaseModel):
     odd_even: str
     confidence: float = 0.0
 
-# load model once at startup
 model = None
+model_type = None
 try:
+    import joblib
     model = joblib.load(MODEL_PATH)
+    model_type="rf"
 except Exception as e:
-    model = None
-    print("Warning: Could not load model:", e)
+    model=None
+    print("Model load warning:", e)
 
+@app.get("/")
+def root():
+    return {"status":"ok"}
 
 @app.post("/predict", response_model=PredictResponse)
 def predict(req: PredictRequest):
     if model is None:
-        raise HTTPException(status_code=503, detail="Model not available on server.")
-    # Basic feature creation: use last N numbers -> simple features: last number, mean, std
-    arr = np.array(req.last_numbers[-10:]) if len(req.last_numbers) else np.array([0])
-    feat = np.array([[arr[-1], arr.mean(), arr.std()]])
-    pred = model.predict(feat)[0]
-    # infer properties
-    odd_even = "even" if pred % 2 == 0 else "odd"
-    # example color rule: even -> green, odd -> red
-    color = "Green" if pred % 2 == 0 else "Red"
-    size = "Big" if pred >= 25 else "Small"  # adjust threshold to suit the game's range
-    conf = 0.6
+        raise HTTPException(status_code=503, detail="Model not loaded")
+    seq = np.array(req.last_numbers[-30:]) if req.last_numbers else np.array([0])
+    feat = np.array([[seq[-1], seq.mean(), seq.std()]])
+    pred = int(model.predict(feat)[0])
+    odd_even = "Even" if pred%2==0 else "Odd"
+    color = "Green" if pred%2==0 else "Red"
+    size = "Big" if pred>=25 else "Small"
     return PredictResponse(
-        predicted_number=int(pred),
+        predicted_number=pred,
         predicted_color=color,
         predicted_size=size,
         odd_even=odd_even,
-        confidence=conf
+        confidence=0.6
     )
