@@ -1,4 +1,3 @@
-# requirements.txt
 requests
 beautifulsoup4
 lxml
@@ -11,3 +10,7 @@ uvicorn[standard]
 joblib
 numpy
 scikit-learn
+plotly
+streamlit
+python-multipart
+tensorflow-cpu
