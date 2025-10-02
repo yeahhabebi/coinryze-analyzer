@@ -1,12 +1,6 @@
-streamlit==1.30.0
+streamlit
 pandas
-numpy
-matplotlib
-scikit-learn
-joblib
-fastapi
-uvicorn[standard]
 requests
 beautifulsoup4
+lxml
 apscheduler
-python-dotenv
