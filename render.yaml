@@ -1,51 +1,14 @@
-# render.yaml
-# Infrastructure-as-code file for Render deployment
-# Place in repo root and push to GitHub
-
 services:
   - type: web
-    name: coinryze-frontend
+    name: coinryze-dashboard
     env: docker
-    dockerfilePath: ./Dockerfile.frontend
+    dockerfilePath: ./Dockerfile.streamlit
     plan: free
     autoDeploy: true
     envVars:
-      - key: NODE_ENV
-        value: production
-
-  - type: web
-    name: coinryze-backend
-    env: docker
-    dockerfilePath: ./Dockerfile.backend
-    plan: free
-    autoDeploy: true
-    envVars:
-      - key: MODEL_PATH
-        value: /app/models/rf_model.joblib
-      - key: ALLOWED_ORIGINS
-        value: https://coinryze-frontend.onrender.com
-
-  - type: worker
-    name: coinryze-worker
-    env: docker
-    dockerfilePath: ./Dockerfile.worker
-    plan: free
-    autoDeploy: true
-    envVars:
-      - key: COINRYZE_URL
-        value: https://coinryze.org
+      - key: BACKEND_URL
+        value: https://coinryze-backend.onrender.com
+      - key: S3_BASE_URL
+        value: ""  # Optional, set to your S3 public URL if used
       - key: CSV_PATH
         value: /app/frontend/coinryze_history.csv
-      - key: PARQUET_PATH
-        value: /app/frontend/coinryze_history.parquet
-      - key: FETCH_INTERVAL_MIN
-        value: 1
-      # optional if you want automatic S3 uploads
-      # - key: AWS_ACCESS_KEY_ID
-      #   sync: false
-      # - key: AWS_SECRET_ACCESS_KEY
-      #   sync: false
-      # - key: AWS_REGION
-      #   value: us-east-1
-      # - key: S3_BUCKET
-      #   value: your-bucket-name
