@@ -1,0 +1,13 @@
+cat > frontend/coinryze_history.csv <<'EOF'
+Issue_id,Timestamp,Winnig Number,Winning Color,Winnig Size,Odd_Even
+202510030765, 10:45:00 10/03/2025, 1, Green, Small, Odd
+202510030766, 10:46:00 10/03/2025, 0, Red-purple, Small, Odd
+202510030767, 10:47:00 10/03/2025, 1,Green, Small, Odd
+202510030768, 10:48:00 10/03/2025, 2, Red, Small, Even
+202510030769, 10:49:00 10/03/2025, 3, Green, Small, Odd
+202510030770, 10:50:00 10/03/2025, 3, Green, Small, Odd
+202510030771, 10:51:00 10/03/2025, 6, Red, Big, Even
+202510030772, 10:52:00 10/03/2025, 6, Red, Big, Even
+202510030773, 10:53:00 10/03/2025, 7, Green, Big, Odd
+202510030774, 10:54:00 10/03/2025, 9, Green, Big, Odd
+EOF b
