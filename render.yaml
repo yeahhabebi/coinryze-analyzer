@@ -1,9 +1,51 @@
+# render.yaml
+# Infrastructure-as-code file for Render deployment
+# Place in repo root and push to GitHub
+
 services:
   - type: web
-    name: coinryze-analyzer
-    env: python
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "streamlit run frontend/app.py --server.port $PORT --server.address 0.0.0.0"
+    name: coinryze-frontend
+    env: docker
+    dockerfilePath: ./Dockerfile.frontend
+    plan: free
+    autoDeploy: true
     envVars:
-      - key: STREAMLIT_SERVER_PORT
-        value: "10000"
+      - key: NODE_ENV
+        value: production
+
+  - type: web
+    name: coinryze-backend
+    env: docker
+    dockerfilePath: ./Dockerfile.backend
+    plan: free
+    autoDeploy: true
+    envVars:
+      - key: MODEL_PATH
+        value: /app/models/rf_model.joblib
+      - key: ALLOWED_ORIGINS
+        value: https://coinryze-frontend.onrender.com
+
+  - type: worker
+    name: coinryze-worker
+    env: docker
+    dockerfilePath: ./Dockerfile.worker
+    plan: free
+    autoDeploy: true
+    envVars:
+      - key: COINRYZE_URL
+        value: https://coinryze.org
+      - key: CSV_PATH
+        value: /app/frontend/coinryze_history.csv
+      - key: PARQUET_PATH
+        value: /app/frontend/coinryze_history.parquet
+      - key: FETCH_INTERVAL_MIN
+        value: 1
+      # optional if you want automatic S3 uploads
+      # - key: AWS_ACCESS_KEY_ID
+      #   sync: false
+      # - key: AWS_SECRET_ACCESS_KEY
+      #   sync: false
+      # - key: AWS_REGION
+      #   value: us-east-1
+      # - key: S3_BUCKET
+      #   value: your-bucket-name
