@@ -1,1 +1,11 @@
-
+FROM python:3.11-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY fetcher/ ./fetcher/
+COPY frontend/ ./frontend/
+ENV COINRYZE_URL=https://coinryze.org
+ENV CSV_PATH=/app/frontend/coinryze_history.csv
+ENV PARQUET_PATH=/app/frontend/coinryze_history.parquet
+ENV FETCH_INTERVAL_MIN=1
+CMD ["python", "fetcher/fetch_coinryze.py"]
