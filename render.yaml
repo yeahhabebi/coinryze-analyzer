@@ -1,22 +1,39 @@
 services:
+  # === Streamlit Frontend ===
   - type: web
-    name: coinryze-dashboard
-    env: docker
-    dockerfilePath: ./Dockerfile.streamlit
+    name: coinryze-frontend
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run frontend/app.py --server.port $PORT --server.address 0.0.0.0
     plan: free
-    autoDeploy: true
     envVars:
-      - key: BACKEND_URL
-        value: https://coinryze-backend.onrender.com
-      - key: CSV_PATH
-        value: /app/frontend/coinryze_history.csv
+      - key: PYTHONUNBUFFERED
+        value: "1"
 
+  # === FastAPI Backend ===
   - type: web
     name: coinryze-backend
-    env: docker
-    dockerfilePath: ./Dockerfile.backend
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn backend.app:app --host 0.0.0.0 --port $PORT
     plan: free
-    autoDeploy: true
     envVars:
+      - key: PYTHONUNBUFFERED
+        value: "1"
       - key: MODEL_PATH
-        value: /app/models/rf_model.joblib
+        value: models/rf_model.joblib
+
+  # === Worker (Data Collector) ===
+  - type: worker
+    name: coinryze-worker
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: ./render-worker.sh
+    plan: free
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: FETCH_INTERVAL
+        value: "60"   # seconds between fetches
+      - key: DATA_PATH
+        value: frontend/coinryze_history.csv
